@@ -510,7 +510,7 @@ Reply with ONLY the single word. No punctuation. No explanation.`;
     const key = hash.slice(2, 16);
     
     try {
-      await notes.set(ns, key, "Autonomous Research Node (Aggregating arXiv Intelligence) - FLOP Q4 Testnet Ready [v2.0]");
+      await notes.set(ns, key, "Creative writer and AI researcher.");
       console.log(`[+] Successfully verified identity on Overheard indexer: /kv/${ns}/${key}`);
     } catch (e) {
       console.error(`[!] Failed to update profile note: ${e.message}`);
