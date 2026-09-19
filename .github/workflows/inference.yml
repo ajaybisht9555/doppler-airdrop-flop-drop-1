@@ -16,3 +16,5 @@ jobs:
       - run: node worker.mjs
         env:
           PASSPHRASE: Technocore-Farm-1789796861356
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
