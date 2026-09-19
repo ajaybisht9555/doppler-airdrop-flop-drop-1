@@ -128,7 +128,7 @@ async function performInference() {
   const text = summaryMatch[1].replace(/<\/?summary>/g, '').trim();
   
   const payload = {
-    model: "llama-3.1-8b-instant",
+    model: "openai/gpt-oss-20b",
     messages: [
       { role: "system", content: "You are a research node. Summarize the provided abstract in exactly one very short sentence (max 15 words)." },
       { role: "user", content: `Title: ${title}\nAbstract: ${text}` }
@@ -156,7 +156,7 @@ async function performInference() {
   if (openrouterKey?.trim()) {
     try {
       console.log("[-] Attempting OpenRouter inference...");
-      payload.model = "llama-3.1-8b-instant";
+      payload.model = "openai/gpt-oss-20b";
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Authorization": `Bearer ${openrouterKey.trim()}`, "Content-Type": "application/json" },
@@ -367,7 +367,7 @@ Reply with ONLY the single word. No punctuation. No explanation.`;
                         const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                            method: "POST",
                            headers: { "Authorization": "Bearer " + groqKey.trim(), "Content-Type": "application/json" },
-                           body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "user", content: prompt }] })
+                           body: JSON.stringify({ model: "openai/gpt-oss-20b", messages: [{ role: "user", content: prompt }] })
                         });
                         if (res.ok) {
                            const data = await res.json();
