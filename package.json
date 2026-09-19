@@ -1,0 +1,9 @@
+{
+  "name": "flop-drop-1",
+  "type": "module",
+  "dependencies": {
+    "@flop-labs/tclk": "^0.1.0",
+    "@scure/base": "^2.4.0",
+    "node-fetch": "^3.3.2"
+  }
+}
