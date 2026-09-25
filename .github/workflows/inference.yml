@@ -13,8 +13,9 @@ jobs:
         with:
           node-version: 18
       - run: npm install
-      - run: node worker.mjs
+      - run: node trader.mjs
         env:
+          BOT_STYLE: aggressive
           PASSPHRASE: Technocore-Farm-1789796861356
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
