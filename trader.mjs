@@ -32,16 +32,32 @@ async function getMarketData() {
     const refData = await refRes.json();
     const lastSweep = JSON.parse(refData.messages[refData.messages.length - 1].text);
     
-    const yfRes = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/NVDA?interval=1d&range=5d');
+    // Dynamic Timeframes based on bot style
+    let interval = "1d";
+    let range = "14d";
+    
+    if (BOT_STYLE === "aggressive") {
+        interval = "1h";
+        range = "2d";
+    } else if (BOT_STYLE === "contrarian") {
+        interval = "15m";
+        range = "1d";
+    }
+    
+    const yfRes = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/NVDA?interval=${interval}&range=${range}`);
     const yfData = await yfRes.json();
     const quotes = yfData.chart.result[0].indicators.quote[0];
-    const closes = quotes.close.map(c => c.toFixed(2)).join(', ');
-    const volumes = quotes.volume.join(', ');
+    
+    // Get up to the last 15 candles
+    const closes = quotes.close.slice(-15).map(c => c ? c.toFixed(2) : null).filter(c => c).join(', ');
+    const volumes = quotes.volume.slice(-15).map(v => v ? v : null).filter(v => v).join(', ');
 
     return {
         currentPrice: lastSweep.ref.px,
         sweepN: lastSweep.n,
         limits: lastSweep.limits,
+        interval,
+        range,
         closes,
         volumes
     };
@@ -50,15 +66,18 @@ async function getMarketData() {
 async function getAIDecision(market) {
     const prompt = `You are a quantitative NVDA futures trader. 
 Your Risk Profile is: ${BOT_STYLE.toUpperCase()}. 
-Conservative = Only trade strong trends. Aggressive = Scalp small trends. Contrarian = Bet against the trend on overbought/oversold.
+Conservative = Only trade strong macro trends (uses 1-day candles).
+Aggressive = Scalp intraday breakouts (uses 1-hour candles).
+Contrarian = Bet against the trend on fast overbought/oversold reversals (uses 15-minute candles).
 
 Current NVDA Price: $${market.currentPrice}
-Last 5 Daily Closes: ${market.closes}
-Last 5 Daily Volumes: ${market.volumes}
+Chart Timeframe: ${market.interval} (over ${market.range})
+Recent Closes: ${market.closes}
+Recent Volumes: ${market.volumes}
 Price Limits for this sweep: ${market.limits[0]} to ${market.limits[1]}
 
-Analyze the momentum. Output a JSON object exactly like this:
-{"action": "buy", "confidence": 85, "reasoning": "strong upward momentum"}
+Analyze the momentum based on YOUR specific timeframe. Output a JSON object exactly like this:
+{"action": "buy", "confidence": 85, "reasoning": "strong upward momentum on the hourly chart"}
 Allowed actions: "buy", "sell", "hold".
 Do not output any markdown or extra text. Just the raw JSON.`;
 
@@ -116,7 +135,7 @@ async function run() {
     console.log(`[+] Waking up bot: ${agent.did} (${BOT_STYLE})`);
     
     const market = await getMarketData();
-    console.log(`[+] NVDA Price: $${market.currentPrice} | Sweep: ${market.sweepN}`);
+    console.log(`[+] NVDA Price: $${market.currentPrice} | Sweep: ${market.sweepN} | Timeframe: ${market.interval}`);
     
     const decision = await getAIDecision(market);
     console.log(`[+] AI Decision: ${decision.action.toUpperCase()} | Confidence: ${decision.confidence}% | Reasoning: ${decision.reasoning}`);
