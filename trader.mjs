@@ -199,6 +199,16 @@ async function run() {
         }
     } else {
         console.log(`[+] Confidence too low (${decision.confidence}%). Holding position.`);
+        // HEARTBEAT LOGIC: Broadcast our AI analysis so it shows up on the UI dashboard
+        console.log(`[+] Broadcasting AI Analysis Heartbeat to network...`);
+        await postMessage({
+            t: "market_analysis",
+            agent_style: BOT_STYLE,
+            action: decision.action,
+            confidence: decision.confidence,
+            reasoning: decision.reasoning,
+            season: "close-1"
+        });
     }
 }
 run();
