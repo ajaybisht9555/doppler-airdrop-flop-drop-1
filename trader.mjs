@@ -1,17 +1,28 @@
 import fetch from 'node-fetch';
-import crypto from 'node:crypto';
+import crypto, { createPrivateKey } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { base58, base64urlnopad } from '@scure/base';
 
 // --- CRYPTO SETUP ---
 const MULTICODEC_ED25519 = new Uint8Array([0xed, 0x01]);
-function getAgent(passphrase) {
-    const seed = crypto.createHash('sha256').update(passphrase).digest();
+function getAgentFromPem(pemPath, passphrase) {
+    const pem = readFileSync(pemPath, 'utf8');
+    const privateKey = createPrivateKey({
+        key: pem,
+        format: 'pem',
+        type: 'pkcs8',
+        passphrase: passphrase
+    });
+    // Extract the 32-byte seed from the raw DER
+    const raw = privateKey.export({ format: 'der', type: 'pkcs8' });
+    const seed = raw.subarray(raw.length - 32);
     const publicKey = ed25519.getPublicKey(seed);
     const multi = new Uint8Array(MULTICODEC_ED25519.length + publicKey.length);
     multi.set(MULTICODEC_ED25519, 0);
     multi.set(publicKey, MULTICODEC_ED25519.length);
     const did = `did:key:z${base58.encode(multi)}`;
+    
     return {
         did,
         sign: (canonical) => base64urlnopad.encode(ed25519.sign(new TextEncoder().encode(canonical), seed))
@@ -20,10 +31,11 @@ function getAgent(passphrase) {
 
 // --- CONFIG ---
 const PASSPHRASE = process.env.PASSPHRASE;
+const IDENTITY_PATH = process.env.IDENTITY_PATH || 'identity.pem';
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const BOT_STYLE = process.env.BOT_STYLE || 'conservative';
 
-const agent = getAgent(PASSPHRASE);
+const agent = getAgentFromPem(IDENTITY_PATH, PASSPHRASE);
 const ROOM = "close1";
 
 // --- FETCH DATA ---
