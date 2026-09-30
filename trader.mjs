@@ -122,7 +122,7 @@ async function scanForOffers(action, targetPrice) {
     for (const msg of data.messages) {
         try {
             const p = JSON.parse(msg.text);
-            if (p.t === "offer" && p.terms && p.maker_sig) {
+            if (p.terms && p.maker_sig) { // Relaxed shape for scanning offers
                 if (p.terms.side !== action && p.terms.taker === "any") {
                     offers.push(p);
                 }
@@ -145,6 +145,14 @@ async function postMessage(textObj) {
 
 async function run() {
     console.log(`[+] Waking up bot: ${agent.did} (${BOT_STYLE})`);
+    
+    // ALIVE HEARTBEAT: Always post an owner message to update "LAST SEEN" on the UI
+    await postMessage({
+        t: "owner",
+        season: "close-1",
+        key: agent.did
+    });
+    console.log(`[+] Broadcasted official t:owner ping to update frontend profile!`);
     
     const market = await getMarketData();
     console.log(`[+] NVDA Price: $${market.currentPrice} | Sweep: ${market.sweepN} | Timeframe: ${market.interval}`);
@@ -190,25 +198,15 @@ async function run() {
             const parsedTerms = JSON.parse(termsStr);
             const makerSig = agent.sign(`close-1|terms|${termsStr}`);
             
+            // Format identical to what other bots use on the dashboard
             await postMessage({
-                t: "offer",
-                terms: parsedTerms,
-                maker_sig: makerSig
+                maker_sig: makerSig,
+                terms: parsedTerms
             });
             console.log(`[+] Offer broadcasted!`);
         }
     } else {
         console.log(`[+] Confidence too low (${decision.confidence}%). Holding position.`);
-        // HEARTBEAT LOGIC: Broadcast our AI analysis so it shows up on the UI dashboard
-        console.log(`[+] Broadcasting AI Analysis Heartbeat to network...`);
-        await postMessage({
-            t: "market_analysis",
-            agent_style: BOT_STYLE,
-            action: decision.action,
-            confidence: decision.confidence,
-            reasoning: decision.reasoning,
-            season: "close-1"
-        });
     }
 }
 run();
