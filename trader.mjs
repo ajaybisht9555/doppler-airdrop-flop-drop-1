@@ -115,7 +115,7 @@ Do not output any markdown or extra text. Just the raw JSON.`;
     }
 }
 
-async function scanForOffers(action, targetPrice) {
+async function scanForOffers(action, maxWillingToPay, minWillingToReceive) {
     const res = await fetch(`https://technocore.chat/r/${ROOM}?format=json`);
     const data = await res.json();
     const offers = [];
@@ -124,7 +124,12 @@ async function scanForOffers(action, targetPrice) {
             const p = JSON.parse(msg.text);
             if (p.terms && p.maker_sig) { // Relaxed shape for scanning offers
                 if (p.terms.side !== action && p.terms.taker === "any") {
-                    offers.push(p);
+                    const offerPx = parseFloat(p.terms.px);
+                    if (action === "buy" && offerPx <= maxWillingToPay) {
+                        offers.push(p);
+                    } else if (action === "sell" && offerPx >= minWillingToReceive) {
+                        offers.push(p);
+                    }
                 }
             }
         } catch(e){}
@@ -161,22 +166,27 @@ async function run() {
     console.log(`[+] AI Decision: ${decision.action.toUpperCase()} | Confidence: ${decision.confidence}% | Reasoning: ${decision.reasoning}`);
     
     if (decision.action !== "hold" && decision.confidence >= 80) {
-        const qty = "5.00"; // Increasing volume to make the trades hit harder!
+        const qty = "5.00"; // Increased volume
         const currentPriceFloat = parseFloat(market.currentPrice);
         
-        // CROSS THE SPREAD: Offer a slightly better price to guarantee high-frequency bots fill us instantly
         let aggressivePrice = currentPriceFloat;
+        let maxWillingToPay = currentPriceFloat;
+        let minWillingToReceive = currentPriceFloat;
+        
         if (decision.action === "buy") {
-            aggressivePrice = currentPriceFloat * 1.005; // Willing to pay 0.5% more
+            aggressivePrice = currentPriceFloat * 1.005; 
+            maxWillingToPay = aggressivePrice; 
         } else if (decision.action === "sell") {
-            aggressivePrice = currentPriceFloat * 0.995; // Willing to sell for 0.5% less
+            aggressivePrice = currentPriceFloat * 0.995; 
+            minWillingToReceive = aggressivePrice;
         }
         const finalPrice = aggressivePrice.toFixed(2);
         
-        const offers = await scanForOffers(decision.action, finalPrice);
+        // Ensure we ONLY take offers that meet our crossed-spread price limits!
+        const offers = await scanForOffers(decision.action, maxWillingToPay, minWillingToReceive);
         if (offers.length > 0) {
             const bestOffer = offers[0];
-            console.log(`[+] Found matching offer from ${bestOffer.terms.maker}! Executing trade...`);
+            console.log(`[+] Found matching offer at $${bestOffer.terms.px} from ${bestOffer.terms.maker}! Executing trade...`);
             
             const termsStr = JSON.stringify(bestOffer.terms);
             const takerSig = agent.sign(`close-1|accept|${termsStr}|${agent.did}`);
@@ -191,7 +201,7 @@ async function run() {
             });
             console.log(`[+] Trade submitted to referee!`);
         } else {
-            console.log(`[+] No matching offers found. Broadcasting new limit order at $${finalPrice} (crossed spread)...`);
+            console.log(`[+] No strictly matching offers found. Broadcasting new limit order at $${finalPrice} (crossed spread)...`);
             
             const terms = {
                 id: crypto.randomBytes(4).toString('hex'),
