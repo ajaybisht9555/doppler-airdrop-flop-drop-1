@@ -161,10 +161,19 @@ async function run() {
     console.log(`[+] AI Decision: ${decision.action.toUpperCase()} | Confidence: ${decision.confidence}% | Reasoning: ${decision.reasoning}`);
     
     if (decision.action !== "hold" && decision.confidence >= 80) {
-        const qty = "1.00";
-        const price = market.currentPrice;
+        const qty = "5.00"; // Increasing volume to make the trades hit harder!
+        const currentPriceFloat = parseFloat(market.currentPrice);
         
-        const offers = await scanForOffers(decision.action, price);
+        // CROSS THE SPREAD: Offer a slightly better price to guarantee high-frequency bots fill us instantly
+        let aggressivePrice = currentPriceFloat;
+        if (decision.action === "buy") {
+            aggressivePrice = currentPriceFloat * 1.005; // Willing to pay 0.5% more
+        } else if (decision.action === "sell") {
+            aggressivePrice = currentPriceFloat * 0.995; // Willing to sell for 0.5% less
+        }
+        const finalPrice = aggressivePrice.toFixed(2);
+        
+        const offers = await scanForOffers(decision.action, finalPrice);
         if (offers.length > 0) {
             const bestOffer = offers[0];
             console.log(`[+] Found matching offer from ${bestOffer.terms.maker}! Executing trade...`);
@@ -182,12 +191,12 @@ async function run() {
             });
             console.log(`[+] Trade submitted to referee!`);
         } else {
-            console.log(`[+] No matching offers found. Broadcasting new offer to the room...`);
+            console.log(`[+] No matching offers found. Broadcasting new limit order at $${finalPrice} (crossed spread)...`);
             
             const terms = {
                 id: crypto.randomBytes(4).toString('hex'),
                 maker: agent.did,
-                px: price,
+                px: finalPrice,
                 qty: qty,
                 side: decision.action,
                 taker: "any",
@@ -198,12 +207,11 @@ async function run() {
             const parsedTerms = JSON.parse(termsStr);
             const makerSig = agent.sign(`close-1|terms|${termsStr}`);
             
-            // Format identical to what other bots use on the dashboard
             await postMessage({
                 maker_sig: makerSig,
                 terms: parsedTerms
             });
-            console.log(`[+] Offer broadcasted!`);
+            console.log(`[+] Highly-lucrative offer broadcasted to network! Awaiting snipe...`);
         }
     } else {
         console.log(`[+] Confidence too low (${decision.confidence}%). Holding position.`);
